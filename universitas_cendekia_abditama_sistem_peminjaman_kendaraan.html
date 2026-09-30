@@ -1,0 +1,1103 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Peminjaman & Logbook Kendaraan Operasional - Universitas Cendekia Abditama</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Leaflet JS & CSS for Interactive Maps -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- QR Code Generator Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        uca: {
+                            navy: '#0F2C59',
+                            blue: '#1A5F7A',
+                            gold: '#C59B27',
+                            light: '#F8FAFC',
+                            subtle: '#E2E8F0'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        #map { height: 260px; width: 100%; border-radius: 0.75rem; z-index: 1; }
+        .glass-panel { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(8px); }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex flex-col antialiased selection:bg-uca-blue selection:text-white">
+
+    <!-- HEADER & NAVBAR -->
+    <header class="bg-uca-navy text-white shadow-lg sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-20">
+                <!-- Branding -->
+                <div class="flex items-center space-x-3 cursor-pointer" onclick="switchTab('booking')">
+                    <div class="w-11 h-11 bg-white rounded-xl flex items-center justify-center text-uca-navy font-bold text-xl shadow-md border-2 border-uca-gold">
+                        UCA
+                    </div>
+                    <div>
+                        <div class="flex items-center space-x-2">
+                            <h1 class="text-lg font-bold tracking-tight text-white leading-tight">Universitas Cendekia Abditama</h1>
+                        </div>
+                        <p class="text-xs text-slate-300 font-medium">Unit Sarana & Prasarana (Sarpras) • Avanza B 1234 UCA</p>
+                    </div>
+                </div>
+
+                <!-- Desktop Navigation Tabs -->
+                <nav class="hidden md:flex space-x-1 bg-slate-800/60 p-1.5 rounded-xl border border-slate-700">
+                    <button onclick="switchTab('booking')" id="nav-booking" class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center space-x-2 bg-uca-blue text-white shadow">
+                        <i data-lucide="file-text" class="w-4 h-4"></i>
+                        <span>Pengajuan Peminjaman</span>
+                    </button>
+                    <button onclick="switchTab('logbook')" id="nav-logbook" class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center space-x-2 text-slate-300 hover:text-white hover:bg-slate-700/50">
+                        <i data-lucide="clipboard-list" class="w-4 h-4"></i>
+                        <span>Logbook Perjalanan</span>
+                    </button>
+                    <button onclick="switchTab('dashboard')" id="nav-dashboard" class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center space-x-2 text-slate-300 hover:text-white hover:bg-slate-700/50">
+                        <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
+                        <span>Dashboard Sarpras</span>
+                        <span id="badge-pending" class="bg-amber-500 text-slate-900 text-xs px-2 py-0.5 rounded-full font-bold ml-1">2</span>
+                    </button>
+                </nav>
+
+                <!-- Status Badge -->
+                <div class="hidden lg:flex items-center space-x-3">
+                    <div class="flex items-center space-x-2 bg-emerald-950/80 border border-emerald-500/40 px-3 py-1.5 rounded-full">
+                        <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                        <span class="text-xs font-semibold text-emerald-200">Avanza Ready di Parkiran</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mobile Navigation Row -->
+        <div class="md:hidden bg-slate-900 border-t border-slate-800 px-2 py-2 flex justify-around">
+            <button onclick="switchTab('booking')" id="mob-nav-booking" class="flex flex-col items-center py-1 px-3 rounded-lg text-uca-gold font-semibold text-xs">
+                <i data-lucide="file-text" class="w-5 h-5 mb-1"></i>
+                <span>Pengajuan</span>
+            </button>
+            <button onclick="switchTab('logbook')" id="mob-nav-logbook" class="flex flex-col items-center py-1 px-3 rounded-lg text-slate-400 font-medium text-xs">
+                <i data-lucide="clipboard-list" class="w-5 h-5 mb-1"></i>
+                <span>Logbook</span>
+            </button>
+            <button onclick="switchTab('dashboard')" id="mob-nav-dashboard" class="flex flex-col items-center py-1 px-3 rounded-lg text-slate-400 font-medium text-xs">
+                <i data-lucide="layout-dashboard" class="w-5 h-5 mb-1"></i>
+                <span>Dashboard</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- MAIN CONTENT AREA -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+        <!-- ================= TAB 1: FORM PENGAJUAN PEMINJAMAN ================= -->
+        <section id="tab-booking" class="space-y-6">
+            <!-- Banner / Instructions -->
+            <div class="bg-gradient-to-r from-uca-navy via-uca-blue to-slate-800 rounded-2xl p-6 text-white shadow-xl relative overflow-hidden">
+                <div class="relative z-10 max-w-3xl">
+                    <div class="inline-flex items-center space-x-2 bg-white/10 backdrop-blur-md px-3 py-1 rounded-full text-xs font-medium text-uca-gold mb-3 border border-white/10">
+                        <i data-lucide="info" class="w-3.5 h-3.5"></i>
+                        <span>SOP Sarpras Universitas Cendekia Abditama</span>
+                    </div>
+                    <h2 class="text-2xl sm:text-3xl font-bold tracking-tight mb-2">Form Pengajuan Kendaraan Operasional</h2>
+                    <p class="text-slate-200 text-sm leading-relaxed">
+                        Pengajuan dilakukan minimal <span class="text-uca-gold font-semibold">H-2 sebelum jadwal keberangkatan</span>. Pastikan Anda telah memiliki <strong>Surat Pengajuan Resmi</strong> yang sudah ditandatangani oleh Atasan Langsung/Dekan/Kaprodi.
+                    </p>
+                </div>
+                <div class="absolute -right-10 -bottom-10 opacity-10 pointer-events-none">
+                    <i data-lucide="car" class="w-80 h-80 text-white"></i>
+                </div>
+            </div>
+
+            <!-- Main Form Card -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                <!-- Left Column: Form Inputs (7 Cols) -->
+                <div class="lg:col-span-7 bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-200 space-y-6">
+                    <form id="booking-form" onsubmit="handleBookingSubmit(event)">
+                        
+                        <!-- Section 1: Identitas Pemohon -->
+                        <div>
+                            <div class="flex items-center space-x-2 pb-3 mb-4 border-b border-slate-100">
+                                <div class="w-8 h-8 rounded-lg bg-blue-50 text-uca-blue flex items-center justify-center font-bold text-sm">1</div>
+                                <h3 class="font-bold text-slate-800 text-base">Identitas Pemohon</h3>
+                            </div>
+                            
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-700 mb-1">Nama Lengkap & Gelar *</label>
+                                    <input type="text" id="pemohon-nama" required placeholder="Contoh: Dr. Ir. Ahmad Fauzi, M.T." 
+                                        class="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-300 focus:ring-2 focus:ring-uca-blue focus:border-uca-blue outline-none transition">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-700 mb-1">NIP / NIDN / NIM *</label>
+                                    <input type="text" id="pemohon-nip" required placeholder="Contoh: 198503122010121003" 
+                                        class="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-300 focus:ring-2 focus:ring-uca-blue focus:border-uca-blue outline-none transition">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-700 mb-1">Unit Kerja / Fakultas / UKM *</label>
+                                    <select id="pemohon-unit" required class="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-300 focus:ring-2 focus:ring-uca-blue focus:border-uca-blue outline-none transition bg-white">
+                                        <option value="">-- Pilih Unit Kerja --</option>
+                                        <option value="Rektorat & Dekanat">Rektorat & Dekanat</option>
+                                        <option value="Fakultas Teknik">Fakultas Teknik</option>
+                                        <option value="Fakultas Ekonomi & Bisnis">Fakultas Ekonomi & Bisnis</option>
+                                        <option value="Fakultas Ilmu Komputer">Fakultas Ilmu Komputer</option>
+                                        <option value="LPPM (Lembaga Penelitian)">LPPM (Lembaga Penelitian)</option>
+                                        <option value="BEM / Unit Kegiatan Mahasiswa">BEM / Unit Kegiatan Mahasiswa (UKM)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-700 mb-1">No. WhatsApp Aktif *</label>
+                                    <input type="tel" id="pemohon-wa" required placeholder="081234567890" 
+                                        class="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-300 focus:ring-2 focus:ring-uca-blue focus:border-uca-blue outline-none transition">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Section 2: Upload Surat & Detail Waktu -->
+                        <div class="pt-4">
+                            <div class="flex items-center space-x-2 pb-3 mb-4 border-b border-slate-100">
+                                <div class="w-8 h-8 rounded-lg bg-blue-50 text-uca-blue flex items-center justify-center font-bold text-sm">2</div>
+                                <h3 class="font-bold text-slate-800 text-base">Surat Pengajuan & Jadwal</h3>
+                            </div>
+
+                            <div class="space-y-4">
+                                <!-- File Upload Box -->
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-700 mb-1">Upload Surat Pengajuan Peminjaman (PDF/JPG) *</label>
+                                    <div class="border-2 border-dashed border-slate-300 rounded-xl p-4 text-center hover:bg-slate-50 transition cursor-pointer relative" id="upload-box" onclick="document.getElementById('surat-file').click()">
+                                        <input type="file" id="surat-file" class="hidden" accept=".pdf,.jpg,.jpeg,.png" onchange="handleFileSelected(this)">
+                                        <div id="upload-default" class="space-y-1">
+                                            <i data-lucide="upload-cloud" class="w-8 h-8 mx-auto text-slate-400"></i>
+                                            <p class="text-xs font-semibold text-slate-700">Klik untuk mengunggah Surat Pengajuan</p>
+                                            <p class="text-[10px] text-slate-500">Maksimal file 5MB (Format PDF/Image)</p>
+                                        </div>
+                                        <div id="upload-success" class="hidden flex items-center justify-center space-x-2 text-emerald-600 font-semibold text-xs">
+                                            <i data-lucide="check-circle" class="w-5 h-5"></i>
+                                            <span id="file-name-text">Surat_Pengajuan_UCA.pdf</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Tanggal & Jam -->
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-xs font-semibold text-slate-700 mb-1">Tanggal & Jam Keberangkatan *</label>
+                                        <input type="datetime-local" id="tgl-berangkat" required 
+                                            class="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-300 focus:ring-2 focus:ring-uca-blue focus:border-uca-blue outline-none transition">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-semibold text-slate-700 mb-1">Estimasi Tanggal & Jam Kembali *</label>
+                                        <input type="datetime-local" id="tgl-kembali" required 
+                                            class="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-300 focus:ring-2 focus:ring-uca-blue focus:border-uca-blue outline-none transition">
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-700 mb-1">Keperluan / Agenda Perjalanan *</label>
+                                    <textarea id="keperluan-text" required rows="2" placeholder="Contoh: Pengabdian Masyarakat ke Desa Cikande dan Pendampingan KKN..."
+                                        class="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-300 focus:ring-2 focus:ring-uca-blue focus:border-uca-blue outline-none transition"></textarea>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Section 3: Lokasi & Kalkulator Real-time -->
+                        <div class="pt-4">
+                            <div class="flex items-center space-x-2 pb-3 mb-4 border-b border-slate-100">
+                                <div class="w-8 h-8 rounded-lg bg-blue-50 text-uca-blue flex items-center justify-center font-bold text-sm">3</div>
+                                <h3 class="font-bold text-slate-800 text-base">Rute & Destinasi Perjalanan</h3>
+                            </div>
+
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-700 mb-1">Titik Keberangkatan (Asal)</label>
+                                    <div class="relative">
+                                        <input type="text" id="titik-asal" value="Universitas Cendekia Abditama (Kampus Utama)" 
+                                            class="w-full pl-9 pr-3.5 py-2.5 text-sm rounded-xl border border-slate-200 bg-slate-100 text-slate-600 cursor-not-allowed font-medium" readonly>
+                                        <i data-lucide="map-pin" class="w-4 h-4 text-emerald-600 absolute left-3 top-3"></i>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-700 mb-1">Titik / Alamat Tujuan Lengkap *</label>
+                                    <div class="relative">
+                                        <input type="text" id="titik-tujuan" required placeholder="Contoh: Kantor Dindik Banten, Serpong, atau Kota Bandung" 
+                                            oninput="updateCalculatorRealtime()"
+                                            class="w-full pl-9 pr-3.5 py-2.5 text-sm rounded-xl border border-slate-300 focus:ring-2 focus:ring-uca-blue focus:border-uca-blue outline-none transition">
+                                        <i data-lucide="navigation" class="w-4 h-4 text-rose-500 absolute left-3 top-3"></i>
+                                    </div>
+                                    <p class="text-[11px] text-slate-500 mt-1">Pilih destinasi di bawah atau ketik alamat spesifik untuk menghitung otomatis.</p>
+                                </div>
+
+                                <!-- Preset Quick Destinations -->
+                                <div>
+                                    <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Preset Destinasi Sering Dikunjungi UCA:</label>
+                                    <div class="flex flex-wrap gap-2">
+                                        <button type="button" onclick="selectPreset('Pemerintah Kota Tangerang', 28)" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium rounded-lg transition border border-slate-200">
+                                            🏢 Pemkot Tangerang (28 KM)
+                                        </button>
+                                        <button type="button" onclick="selectPreset('Kawasan Puspiptek Serpong', 42)" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium rounded-lg transition border border-slate-200">
+                                            🔬 BRIN / Puspiptek Serpong (42 KM)
+                                        </button>
+                                        <button type="button" onclick="selectPreset('Gedung Kemendikbud Jakarta', 65)" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium rounded-lg transition border border-slate-200">
+                                            🏛️ Kemendikbud Jakarta (65 KM)
+                                        </button>
+                                        <button type="button" onclick="selectPreset('Pusat Pemerintahan Provinsi Banten (KP3B) Serang', 85)" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium rounded-lg transition border border-slate-200">
+                                            🏛️ KP3B Serang (85 KM)
+                                        </button>
+                                        <button type="button" onclick="selectPreset('Gedung Sate Bandung', 175)" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium rounded-lg transition border border-slate-200">
+                                            🏔️ Gedung Sate Bandung (175 KM)
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Submit Button -->
+                        <div class="pt-6 border-t border-slate-100">
+                            <button type="submit" class="w-full py-3.5 px-6 bg-uca-navy hover:bg-uca-blue text-white font-bold rounded-xl shadow-lg hover:shadow-xl transition transform active:scale-[0.99] flex items-center justify-center space-x-2">
+                                <i data-lucide="send" class="w-5 h-5"></i>
+                                <span>Kirim Pengajuan Peminjaman</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Right Column: Real-time Avanza Calculator & Interactive Map (5 Cols) -->
+                <div class="lg:col-span-5 space-y-6">
+                    
+                    <!-- Real-time Cost Badge Card -->
+                    <div class="bg-slate-900 rounded-2xl p-6 text-white shadow-xl border border-slate-800 space-y-5">
+                        <div class="flex items-center justify-between pb-4 border-b border-slate-800">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-10 h-10 rounded-xl bg-uca-gold/20 border border-uca-gold/50 flex items-center justify-center text-uca-gold">
+                                    <i data-lucide="calculator" class="w-5 h-5"></i>
+                                </div>
+                                <div>
+                                    <h4 class="font-bold text-base text-white">Kalkulator Bensin Avanza</h4>
+                                    <p class="text-xs text-slate-400">Armada UCA • Rasio 1 Liter : 10 KM</p>
+                                </div>
+                            </div>
+                            <span class="bg-uca-blue text-xs font-bold px-2.5 py-1 rounded-full text-white border border-cyan-400/30">Otomatis</span>
+                        </div>
+
+                        <!-- Metrics Grid -->
+                        <div class="grid grid-cols-2 gap-3">
+                            <div class="bg-slate-800/80 rounded-xl p-3.5 border border-slate-700/60">
+                                <p class="text-[11px] font-medium text-slate-400 mb-0.5">Estimasi Jarak PP</p>
+                                <p id="calc-jarak-display" class="text-xl font-bold text-emerald-400">0 KM</p>
+                                <p class="text-[10px] text-slate-500 mt-1">Perjalanan Pulang-Pergi</p>
+                            </div>
+                            <div class="bg-slate-800/80 rounded-xl p-3.5 border border-slate-700/60">
+                                <p class="text-[11px] font-medium text-slate-400 mb-0.5">Kebutuhan BBM</p>
+                                <p id="calc-liter-display" class="text-xl font-bold text-cyan-300">0 Liter</p>
+                                <p class="text-[10px] text-slate-500 mt-1">Konsumsi Avanza 1.3/1.5</p>
+                            </div>
+                        </div>
+
+                        <!-- Total Biaya Box -->
+                        <div class="bg-gradient-to-r from-amber-950/60 to-slate-800 p-4 rounded-xl border border-amber-500/30 flex items-center justify-between">
+                            <div>
+                                <p class="text-xs font-medium text-amber-200">Perkiraan Biaya Bensin (RP)</p>
+                                <h3 id="calc-biaya-display" class="text-2xl font-extrabold text-uca-gold">Rp 0</h3>
+                            </div>
+                            <div class="text-right">
+                                <label class="block text-[10px] text-slate-400">Tarif BBM / Liter:</label>
+                                <select id="tarif-bbm" onchange="updateCalculatorRealtime()" class="bg-slate-900 border border-slate-700 text-xs text-amber-300 rounded px-2 py-1 focus:outline-none">
+                                    <option value="10000" selected>Pertalite (Rp 10.000)</option>
+                                    <option value="12950">Pertamax (Rp 12.950)</option>
+                                    <option value="14000">Dexlite (Rp 14.000)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="text-[11px] text-slate-400 leading-relaxed bg-slate-950/50 p-3 rounded-lg border border-slate-800">
+                            💡 <strong class="text-slate-300">Catatan Sarpras:</strong> Nominal biaya di atas adalah acuan pengajuan dana operasional bensin. Pengisian BBM asli disesuaikan dengan nota/struk saat klaim.
+                        </div>
+                    </div>
+
+                    <!-- Interactive Leaflet Map -->
+                    <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 space-y-2">
+                        <div class="flex items-center justify-between px-1">
+                            <span class="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                                <i data-lucide="map" class="w-4 h-4 text-uca-blue"></i> Simulated Route Visualizer
+                            </span>
+                            <span id="route-status" class="text-[11px] font-semibold text-slate-500">Siap Menghitung</span>
+                        </div>
+                        <div id="map"></div>
+                    </div>
+
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= TAB 2: FORM LOGBOOK DIGITAL ================= -->
+        <section id="tab-logbook" class="hidden space-y-6">
+            <!-- Header Banner -->
+            <div class="bg-slate-900 rounded-2xl p-6 text-white shadow-lg border border-slate-800 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                    <div class="inline-flex items-center space-x-1.5 bg-emerald-500/20 text-emerald-300 px-3 py-1 rounded-full text-xs font-semibold border border-emerald-500/30 mb-2">
+                        <i data-lucide="qr-code" class="w-3.5 h-3.5"></i>
+                        <span>Scan QR Code Dasbor / Gantungan Kunci</span>
+                    </div>
+                    <h2 class="text-2xl font-bold tracking-tight">Logbook Digital Kendaraan Operasional</h2>
+                    <p class="text-slate-400 text-xs mt-1">Wajib diisi oleh Pengemudi/Peminjam sebelum berangkat & saat mengembalikan Avanza UCA.</p>
+                </div>
+                <button onclick="openQrModal()" class="px-4 py-2.5 bg-uca-gold hover:bg-amber-500 text-slate-950 font-bold text-xs rounded-xl shadow transition flex items-center space-x-2">
+                    <i data-lucide="printer" class="w-4 h-4"></i>
+                    <span>Cetak Stiker QR Mobil</span>
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                <!-- Logbook Form -->
+                <div class="lg:col-span-8 bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-200">
+                    <form id="logbook-form" onsubmit="handleLogbookSubmit(event)" class="space-y-6">
+                        
+                        <!-- Choice: Berangkat or Kembali -->
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Status Transaksi Logbook *</label>
+                            <div class="grid grid-cols-2 gap-4">
+                                <label class="cursor-pointer">
+                                    <input type="radio" name="logbook-status" value="BERANGKAT" checked class="peer hidden" onchange="toggleLogbookMode('BERANGKAT')">
+                                    <div class="p-4 rounded-xl border-2 border-slate-200 peer-checked:border-emerald-500 peer-checked:bg-emerald-50/50 flex items-center space-x-3 transition">
+                                        <div class="w-10 h-10 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold">
+                                            <i data-lucide="arrow-up-right" class="w-5 h-5"></i>
+                                        </div>
+                                        <div>
+                                            <p class="font-bold text-sm text-slate-800">BERANGKAT</p>
+                                            <p class="text-[11px] text-slate-500">Ambil Kunci & Mobil</p>
+                                        </div>
+                                    </div>
+                                </label>
+
+                                <label class="cursor-pointer">
+                                    <input type="radio" name="logbook-status" value="KEMBALI" class="peer hidden" onchange="toggleLogbookMode('KEMBALI')">
+                                    <div class="p-4 rounded-xl border-2 border-slate-200 peer-checked:border-blue-500 peer-checked:bg-blue-50/50 flex items-center space-x-3 transition">
+                                        <div class="w-10 h-10 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center font-bold">
+                                            <i data-lucide="arrow-down-left" class="w-5 h-5"></i>
+                                        </div>
+                                        <div>
+                                            <p class="font-bold text-sm text-slate-800">PENGEMBALIAN</p>
+                                            <p class="text-[11px] text-slate-500">Kembalikan Kunci & Parkir</p>
+                                        </div>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Identitas & Mobil -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">Nama Pengemudi / Peminjam *</label>
+                                <input type="text" id="log-nama" required placeholder="Nama Anda" class="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-300 focus:ring-2 focus:ring-uca-blue outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">Armada Kendaraan UCA</label>
+                                <input type="text" value="Toyota Avanza - B 1234 UCA" readonly class="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 bg-slate-100 text-slate-600 font-semibold cursor-not-allowed">
+                            </div>
+                        </div>
+
+                        <!-- Odometer / KM Input -->
+                        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
+                            <div class="flex items-center justify-between">
+                                <label class="block text-xs font-bold text-slate-800">Angka Odometer / Kilometer (KM) Saat Ini *</label>
+                                <span class="text-[11px] text-slate-500">KM Terakhir Terpencat: <strong class="text-slate-800">42,500 KM</strong></span>
+                            </div>
+                            <div class="relative">
+                                <input type="number" id="log-km" required placeholder="Contoh: 42580" class="w-full pl-10 pr-16 py-3 text-lg font-bold text-slate-900 rounded-xl border border-slate-300 focus:ring-2 focus:ring-uca-blue outline-none">
+                                <i data-lucide="gauge" class="w-5 h-5 text-slate-400 absolute left-3 top-3.5"></i>
+                                <span class="absolute right-4 top-3.5 text-xs font-bold text-slate-400">KM</span>
+                            </div>
+                        </div>
+
+                        <!-- Kondisi Fisik & Bensin -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">Kondisi Kebersihan & Fisik *</label>
+                                <select id="log-kondisi" required class="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-300 focus:ring-2 focus:ring-uca-blue outline-none bg-white">
+                                    <option value="Baik & Bersih">✅ Baik & Bersih</option>
+                                    <option value="Perlu Cuci Ringan">🧼 Cukup Baik (Perlu Cuci)</option>
+                                    <option value="Ada Kerusakan/Kendala">⚠️ Ada Kendala / Baret</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">Posisi Bensin Saat Ini *</label>
+                                <select id="log-bensin" required class="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-300 focus:ring-2 focus:ring-uca-blue outline-none bg-white">
+                                    <option value="Full (Penuh)">⛽ Full (Penuh)</option>
+                                    <option value="3/4 Tangki">⛽ 3/4 Tangki</option>
+                                    <option value="1/2 Tangki">⛽ 1/2 Tangki</option>
+                                    <option value="1/4 Tangki (Perlu Isi)">⚠️️ 1/4 Tangki (Perlu Isi)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Checkboxes Kelengkapan -->
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Checklist Kelengkapan Fisik Unit:</label>
+                            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                <label class="flex items-center space-x-2 bg-slate-50 p-2.5 rounded-lg border border-slate-200 text-xs font-medium cursor-pointer">
+                                    <input type="checkbox" checked class="w-4 h-4 text-uca-blue rounded focus:ring-uca-blue">
+                                    <span>STNK Asli</span>
+                                </label>
+                                <label class="flex items-center space-x-2 bg-slate-50 p-2.5 rounded-lg border border-slate-200 text-xs font-medium cursor-pointer">
+                                    <input type="checkbox" checked class="w-4 h-4 text-uca-blue rounded focus:ring-uca-blue">
+                                    <span>Kartu e-Toll</span>
+                                </label>
+                                <label class="flex items-center space-x-2 bg-slate-50 p-2.5 rounded-lg border border-slate-200 text-xs font-medium cursor-pointer">
+                                    <input type="checkbox" checked class="w-4 h-4 text-uca-blue rounded focus:ring-uca-blue">
+                                    <span>Ban Serep</span>
+                                </label>
+                                <label class="flex items-center space-x-2 bg-slate-50 p-2.5 rounded-lg border border-slate-200 text-xs font-medium cursor-pointer">
+                                    <input type="checkbox" checked class="w-4 h-4 text-uca-blue rounded focus:ring-uca-blue">
+                                    <span>Dongkrak & Tool</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Catatan & Upload Foto Odometer -->
+                        <div class="space-y-3">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">Catatan Kendala / Kerusakan (Opsional)</label>
+                                <textarea id="log-catatan" rows="2" placeholder="Contoh: AC terasa kurang dingin saat siang hari, ada goresan halus di bumper..." class="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-300 focus:ring-2 focus:ring-uca-blue outline-none"></textarea>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-lg transition flex items-center justify-center space-x-2">
+                            <i data-lucide="check-circle-2" class="w-5 h-5"></i>
+                            <span>Simpan Catatan Logbook Digital</span>
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Recent Logbook Timeline -->
+                <div class="lg:col-span-4 space-y-4">
+                    <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+                        <h3 class="font-bold text-slate-800 text-base mb-4 flex items-center justify-between">
+                            <span>Riwayat Logbook Terakhir</span>
+                            <i data-lucide="history" class="w-4 h-4 text-slate-400"></i>
+                        </h3>
+
+                        <div id="logbook-timeline" class="space-y-4 relative before:absolute before:inset-0 before:left-3.5 before:w-0.5 before:bg-slate-200">
+                            <!-- Timeline Items Loaded via JS -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= TAB 3: DASHBOARD ADMIN SARPRAS ================= -->
+        <section id="tab-dashboard" class="hidden space-y-6">
+            <!-- Metric Cards -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Pengajuan</p>
+                        <h3 id="stat-total" class="text-2xl font-bold text-slate-900 mt-1">12</h3>
+                        <p class="text-[11px] text-emerald-600 font-medium mt-0.5">↑ 4 pengajuan minggu ini</p>
+                    </div>
+                    <div class="w-12 h-12 rounded-xl bg-blue-50 text-uca-blue flex items-center justify-center">
+                        <i data-lucide="file-text" class="w-6 h-6"></i>
+                    </div>
+                </div>
+
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Menunggu Approval</p>
+                        <h3 id="stat-pending" class="text-2xl font-bold text-amber-600 mt-1">2</h3>
+                        <p class="text-[11px] text-amber-600 font-medium mt-0.5">Perlu konfirmasi Sarpras</p>
+                    </div>
+                    <div class="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+                        <i data-lucide="clock" class="w-6 h-6"></i>
+                    </div>
+                </div>
+
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Jarak Tempuh</p>
+                        <h3 id="stat-km" class="text-2xl font-bold text-slate-900 mt-1">1,420 KM</h3>
+                        <p class="text-[11px] text-slate-500 font-medium mt-0.5">Avanza B 1234 UCA</p>
+                    </div>
+                    <div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                        <i data-lucide="navigation" class="w-6 h-6"></i>
+                    </div>
+                </div>
+
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Est. Total Biaya BBM</p>
+                        <h3 id="stat-bbm" class="text-2xl font-bold text-uca-navy mt-1">Rp 1.420.000</h3>
+                        <p class="text-[11px] text-slate-500 font-medium mt-0.5">Berdasarkan data disetujui</p>
+                    </div>
+                    <div class="w-12 h-12 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
+                        <i data-lucide="fuel" class="w-6 h-6"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Table Card -->
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <!-- Table Header Controls -->
+                <div class="p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                        <h3 class="font-bold text-slate-800 text-lg">Daftar Pengajuan Peminjaman</h3>
+                        <p class="text-xs text-slate-500">Rekapitulasi perizinan peminjaman kendaraan operasional UCA.</p>
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        <select id="filter-status" onchange="renderAdminTable()" class="px-3 py-2 text-xs font-medium rounded-xl border border-slate-300 bg-white text-slate-700 outline-none">
+                            <option value="ALL">Semua Status</option>
+                            <option value="Menunggu Approval">Menunggu Approval</option>
+                            <option value="Disetujui">Disetujui</option>
+                            <option value="Ditolak">Ditolak</option>
+                        </select>
+                        <button onclick="exportToCSV()" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-xl shadow transition flex items-center space-x-1.5">
+                            <i data-lucide="download" class="w-4 h-4"></i>
+                            <span>Export Excel / CSV</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Table Content -->
+                <div class="overflow-x-auto custom-scrollbar">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-slate-50 text-[11px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200">
+                                <th class="py-3.5 px-4">Pemohon & Unit</th>
+                                <th class="py-3.5 px-4">Tujuan & Agenda</th>
+                                <th class="py-3.5 px-4">Jadwal Keberangkatan</th>
+                                <th class="py-3.5 px-4">Est. Jarak / BBM</th>
+                                <th class="py-3.5 px-4">Surat</th>
+                                <th class="py-3.5 px-4">Status</th>
+                                <th class="py-3.5 px-4 text-right">Aksi SARPRAS</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-table-body" class="divide-y divide-slate-100 text-xs font-medium text-slate-700">
+                            <!-- Dynamic Table Rows -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- MODAL 1: QR CODE PRINTABLE STICKER MODAL -->
+    <div id="qr-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl p-6 sm:p-8 max-w-sm w-full text-center space-y-5 shadow-2xl relative border border-slate-100">
+            <button onclick="closeQrModal()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+            <div>
+                <h3 class="font-extrabold text-slate-900 text-lg">Stiker QR Code Logbook</h3>
+                <p class="text-xs text-slate-500 mt-1">Cetak dan tempel stiker ini di dasbor/kaca depan Toyota Avanza UCA.</p>
+            </div>
+
+            <!-- QR Code Canvas Container -->
+            <div class="p-4 bg-slate-50 rounded-2xl border border-slate-200 inline-block shadow-inner">
+                <div id="qrcode-container" class="flex justify-center"></div>
+                <div class="mt-3 pt-2 border-t border-slate-200">
+                    <p class="text-xs font-bold text-uca-navy">TOYOTA AVANZA</p>
+                    <p class="text-[11px] font-mono text-slate-600 font-semibold">B 1234 UCA</p>
+                </div>
+            </div>
+
+            <p class="text-[11px] text-slate-500">Scan QR Code ini dengan kamera smartphone untuk langsung membuka Logbook Digital.</p>
+
+            <button onclick="window.print()" class="w-full py-2.5 bg-uca-navy hover:bg-uca-blue text-white font-bold text-xs rounded-xl shadow transition flex items-center justify-center space-x-2">
+                <i data-lucide="printer" class="w-4 h-4"></i>
+                <span>Cetak Stiker Sekarang</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- MODAL 2: SUBMISSION CONFIRMATION / RECEIPT MODAL -->
+    <div id="receipt-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl p-6 sm:p-8 max-w-lg w-full space-y-5 shadow-2xl relative border border-slate-100">
+            <div class="text-center space-y-2">
+                <div class="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 mx-auto flex items-center justify-center">
+                    <i data-lucide="check-circle" class="w-7 h-7"></i>
+                </div>
+                <h3 class="font-extrabold text-slate-900 text-xl">Pengajuan Berhasil Dikirim!</h3>
+                <p class="text-xs text-slate-500">Data Anda telah masuk ke Sistem Sarpras Universitas Cendekia Abditama.</p>
+            </div>
+
+            <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-2.5 text-xs text-slate-700">
+                <div class="flex justify-between border-b border-slate-200/80 pb-2">
+                    <span class="text-slate-500">Kode Booking:</span>
+                    <span id="rec-code" class="font-mono font-bold text-uca-navy">UCA-2026-089</span>
+                </div>
+                <div class="flex justify-between border-b border-slate-200/80 pb-2">
+                    <span class="text-slate-500">Pemohon:</span>
+                    <span id="rec-nama" class="font-bold">--</span>
+                </div>
+                <div class="flex justify-between border-b border-slate-200/80 pb-2">
+                    <span class="text-slate-500">Tujuan:</span>
+                    <span id="rec-tujuan" class="font-bold">--</span>
+                </div>
+                <div class="flex justify-between border-b border-slate-200/80 pb-2">
+                    <span class="text-slate-500">Estimasi Jarak PP:</span>
+                    <span id="rec-jarak" class="font-bold text-emerald-600">-- KM</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-slate-500">Est. Biaya BBM Avanza:</span>
+                    <span id="rec-biaya" class="font-extrabold text-uca-gold">Rp --</span>
+                </div>
+            </div>
+
+            <div class="bg-blue-50 p-3 rounded-xl border border-blue-100 text-[11px] text-blue-800 leading-relaxed flex items-start space-x-2">
+                <i data-lucide="info" class="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5"></i>
+                <span>Status pengajuan Anda saat ini adalah <strong class="text-amber-700">Menunggu Approval Sarpras</strong>. Konfirmasi akan dikirimkan via WhatsApp.</span>
+            </div>
+
+            <button onclick="closeReceiptModal()" class="w-full py-3 bg-uca-navy hover:bg-uca-blue text-white font-bold text-sm rounded-xl shadow transition">
+                Selesai & Kembali
+            </button>
+        </div>
+    </div>
+
+    <!-- FOOTER -->
+    <footer class="bg-white border-t border-slate-200 py-6 mt-12 text-center text-xs text-slate-500">
+        <div class="max-w-7xl mx-auto px-4">
+            <p class="font-semibold text-slate-700">Universitas Cendekia Abditama (UCA) • Sistem Informasi Sarana & Prasarana</p>
+            <p class="mt-1 text-slate-400">© 2026 Unit Sarpras UCA. Tim Pengelolaan Aset Operasional Kampus.</p>
+        </div>
+    </footer>
+
+    <script>
+        // ================= GLOBAL STATE & MOCK DATA =================
+        let currentTab = 'booking';
+        let leafletMap = null;
+        let routePolyline = null;
+        let currentEstimatedKm = 0;
+        let currentCalculatedCost = 0;
+
+        // Mock Initial Bookings Data
+        let mockBookings = [
+            {
+                id: 'UCA-2026-001',
+                nama: 'Dr. Ir. Ahmad Fauzi, M.T.',
+                nip: '198503122010121003',
+                unit: 'Fakultas Teknik',
+                wa: '081234567890',
+                tujuan: 'Pemerintah Kota Tangerang',
+                keperluan: 'Koordinasi Hibah Riset Smart City',
+                tglBerangkat: '2026-10-02T08:00',
+                tglKembali: '2026-10-02T16:00',
+                jarakKm: 28,
+                biayaBbm: 28000,
+                suratFile: 'Surat_FT_042.pdf',
+                status: 'Menunggu Approval'
+            },
+            {
+                id: 'UCA-2026-002',
+                nama: 'Prof. Dr. Hendra Wijaya',
+                nip: '197802112005011002',
+                unit: 'LPPM (Lembaga Penelitian)',
+                wa: '081987654321',
+                tujuan: 'Kawasan Puspiptek Serpong',
+                keperluan: 'Mondial Uji Laboratorium Sampel Air',
+                tglBerangkat: '2026-10-03T09:00',
+                tglKembali: '2026-10-03T15:00',
+                jarakKm: 42,
+                biayaBbm: 42000,
+                suratFile: 'Surat_LPPM_88.pdf',
+                status: 'Menunggu Approval'
+            },
+            {
+                id: 'UCA-2026-003',
+                nama: 'Siti Rahmawati, S.E., M.M.',
+                nip: '199004152018032001',
+                unit: 'Rektorat & Dekanat',
+                wa: '081311223344',
+                tujuan: 'Gedung Kemendikbud Jakarta',
+                keperluan: 'Penyerahan Dokumen Akreditasi Kampus',
+                tglBerangkat: '2026-09-28T07:30',
+                tglKembali: '2026-09-28T17:00',
+                jarakKm: 65,
+                biayaBbm: 65000,
+                suratFile: 'Surat_Rektorat_12.pdf',
+                status: 'Disetujui'
+            }
+        ];
+
+        // Mock Logbook Timeline
+        let mockLogs = [
+            { nama: 'Budi Santoso (Driver)', km: 42500, status: 'KEMBALI', kondisi: 'Baik & Bersih', bensin: 'Full (Penuh)', wkt: 'Kemarin, 17:30' },
+            { nama: 'Budi Santoso (Driver)', km: 42420, status: 'BERANGKAT', kondisi: 'Baik & Bersih', bensin: 'Full (Penuh)', wkt: 'Kemarin, 07:30' }
+        ];
+
+        // Coordinates UCA Campus (Banten / Tangerang Area)
+        const UCA_COORDS = [-6.2232, 106.6491]; // Tangerang UCA Location
+
+        // Initialize App
+        window.onload = function() {
+            lucide.createIcons();
+            initLeafletMap();
+            renderLogbookTimeline();
+            renderAdminTable();
+            generateQrCode();
+        };
+
+        // Tab Switching Logic
+        function switchTab(tab) {
+            currentTab = tab;
+            ['booking', 'logbook', 'dashboard'].forEach(t => {
+                document.getElementById(`tab-${t}`).classList.add('hidden');
+                
+                // Desktop Nav Buttons
+                const btn = document.getElementById(`nav-${t}`);
+                if (btn) {
+                    btn.classList.remove('bg-uca-blue', 'text-white', 'shadow');
+                    btn.classList.add('text-slate-300');
+                }
+
+                // Mobile Nav Buttons
+                const mobBtn = document.getElementById(`mob-nav-${t}`);
+                if (mobBtn) {
+                    mobBtn.classList.remove('text-uca-gold');
+                    mobBtn.classList.add('text-slate-400');
+                }
+            });
+
+            // Show Active Tab
+            document.getElementById(`tab-${tab}`).classList.remove('hidden');
+            
+            const activeNav = document.getElementById(`nav-${tab}`);
+            if (activeNav) {
+                activeNav.classList.add('bg-uca-blue', 'text-white', 'shadow');
+                activeNav.classList.remove('text-slate-300');
+            }
+
+            const activeMobNav = document.getElementById(`mob-nav-${tab}`);
+            if (activeMobNav) {
+                activeMobNav.classList.add('text-uca-gold');
+                activeMobNav.classList.remove('text-slate-400');
+            }
+
+            if (tab === 'booking' && leafletMap) {
+                setTimeout(() => leafletMap.invalidateSize(), 200);
+            }
+        }
+
+        // Initialize Map
+        function initLeafletMap() {
+            leafletMap = L.map('map').setView(UCA_COORDS, 11);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap UCA Sarpras'
+            }).addTo(leafletMap);
+
+            // Add Marker UCA Campus
+            L.marker(UCA_COORDS).addTo(leafletMap)
+                .bindPopup("<b>Universitas Cendekia Abditama</b><br>Kampus Utama (Titik Awal)")
+                .openPopup();
+        }
+
+        // Realtime Distance & Fuel Calculator
+        function updateCalculatorRealtime() {
+            const destInput = document.getElementById('titik-tujuan').value.trim();
+            if (!destInput) {
+                resetCalculator();
+                return;
+            }
+
+            // Simulated distance logic based on text input length & keywords
+            let calculatedKm = 0;
+            const lower = destInput.toLowerCase();
+
+            if (lower.includes('tangerang')) calculatedKm = 28;
+            else if (lower.includes('serpong') || lower.includes('puspiptek') || lower.includes('brin')) calculatedKm = 42;
+            else if (lower.includes('jakarta') || lower.includes('kemendikbud')) calculatedKm = 65;
+            else if (lower.includes('serang') || lower.includes('kp3b')) calculatedKm = 85;
+            else if (lower.includes('bandung')) calculatedKm = 175;
+            else if (lower.includes('bogor')) calculatedKm = 90;
+            else {
+                // Fallback deterministic calculation from string
+                calculatedKm = Math.max(15, (destInput.length * 3) % 120 + 20);
+            }
+
+            currentEstimatedKm = calculatedKm;
+            
+            // Avanza Fuel Consumption Rate: 1 Liter per 10 KM
+            const litersNeeded = (calculatedKm * 2) / 10; // PP
+            const bbmRate = parseInt(document.getElementById('tarif-bbm').value || "10000");
+            const estimatedCost = litersNeeded * bbmRate;
+            currentCalculatedCost = estimatedCost;
+
+            // Update UI Displays
+            document.getElementById('calc-jarak-display').innerText = `${calculatedKm * 2} KM`;
+            document.getElementById('calc-liter-display').innerText = `${litersNeeded.toFixed(1)} Liter`;
+            document.getElementById('calc-biaya-display').innerText = `Rp ${estimatedCost.toLocaleString('id-ID')}`;
+            document.getElementById('route-status').innerText = `Rute Terhitung: ${calculatedKm * 2} KM PP`;
+
+            // Draw Simulated Map Line
+            drawSimulatedRoute(calculatedKm);
+        }
+
+        function selectPreset(destinationName, kmOneWay) {
+            document.getElementById('titik-tujuan').value = destinationName;
+            updateCalculatorRealtime();
+        }
+
+        function resetCalculator() {
+            currentEstimatedKm = 0;
+            currentCalculatedCost = 0;
+            document.getElementById('calc-jarak-display').innerText = '0 KM';
+            document.getElementById('calc-liter-display').innerText = '0 Liter';
+            document.getElementById('calc-biaya-display').innerText = 'Rp 0';
+            document.getElementById('route-status').innerText = 'Siap Menghitung';
+            if (routePolyline) leafletMap.removeLayer(routePolyline);
+        }
+
+        function drawSimulatedRoute(km) {
+            if (routePolyline) leafletMap.removeLayer(routePolyline);
+
+            // Create destination coordinate offset based on distance
+            const destLat = UCA_COORDS[0] + (km * 0.005);
+            const destLng = UCA_COORDS[1] + (km * 0.007);
+            const destCoords = [destLat, destLng];
+
+            const latlngs = [UCA_COORDS, destCoords];
+            routePolyline = L.polyline(latlngs, { color: '#1A5F7A', weight: 4, opacity: 0.8, dashArray: '8, 8' }).addTo(leafletMap);
+            leafletMap.fitBounds(routePolyline.getBounds(), { padding: [30, 30] });
+        }
+
+        // File Selection Feedback
+        function handleFileSelected(input) {
+            if (input.files && input.files[0]) {
+                document.getElementById('upload-default').classList.add('hidden');
+                document.getElementById('upload-success').classList.remove('hidden');
+                document.getElementById('file-name-text').innerText = input.files[0].name;
+            }
+        }
+
+        // Booking Submission Handling
+        function handleBookingSubmit(e) {
+            e.preventDefault();
+            
+            const nama = document.getElementById('pemohon-nama').value;
+            const nip = document.getElementById('pemohon-nip').value;
+            const unit = document.getElementById('pemohon-unit').value;
+            const wa = document.getElementById('pemohon-wa').value;
+            const tglB = document.getElementById('tgl-berangkat').value;
+            const tglK = document.getElementById('tgl-kembali').value;
+            const tujuan = document.getElementById('titik-tujuan').value;
+            const keperluan = document.getElementById('keperluan-text').value;
+
+            const newBooking = {
+                id: `UCA-2026-${Math.floor(100 + Math.random() * 900)}`,
+                nama, nip, unit, wa,
+                tujuan, keperluan,
+                tglBerangkat: tglB,
+                tglKembali: tglK,
+                jarakKm: currentEstimatedKm * 2,
+                biayaBbm: currentCalculatedCost,
+                suratFile: 'Surat_Pengajuan_Uploaded.pdf',
+                status: 'Menunggu Approval'
+            };
+
+            mockBookings.unshift(newBooking);
+
+            // Populate Modal Receipt
+            document.getElementById('rec-code').innerText = newBooking.id;
+            document.getElementById('rec-nama').innerText = newBooking.nama;
+            document.getElementById('rec-tujuan').innerText = newBooking.tujuan;
+            document.getElementById('rec-jarak').innerText = `${newBooking.jarakKm} KM (PP)`;
+            document.getElementById('rec-biaya').innerText = `Rp ${newBooking.biayaBbm.toLocaleString('id-ID')}`;
+
+            document.getElementById('receipt-modal').classList.remove('hidden');
+            renderAdminTable();
+        }
+
+        function closeReceiptModal() {
+            document.getElementById('receipt-modal').classList.add('hidden');
+            document.getElementById('booking-form').reset();
+            document.getElementById('upload-default').classList.remove('hidden');
+            document.getElementById('upload-success').classList.add('hidden');
+            resetCalculator();
+        }
+
+        // Logbook Form Handling
+        function handleLogbookSubmit(e) {
+            e.preventDefault();
+            const nama = document.getElementById('log-nama').value;
+            const km = document.getElementById('log-km').value;
+            const status = document.querySelector('input[name="logbook-status"]:checked').value;
+            const kondisi = document.getElementById('log-kondisi').value;
+            const bensin = document.getElementById('log-bensin').value;
+
+            mockLogs.unshift({
+                nama,
+                km: parseInt(km),
+                status,
+                kondisi,
+                bensin,
+                wkt: 'Baru Saja'
+            });
+
+            renderLogbookTimeline();
+            document.getElementById('logbook-form').reset();
+            alert('✅ Catatan Logbook Digital Avanza berhasil disimpan!');
+        }
+
+        function renderLogbookTimeline() {
+            const container = document.getElementById('logbook-timeline');
+            container.innerHTML = '';
+
+            mockLogs.forEach(log => {
+                const isBerangkat = log.status === 'BERANGKAT';
+                const badgeBg = isBerangkat ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700';
+
+                container.innerHTML += `
+                    <div class="relative pl-7 space-y-1">
+                        <div class="absolute left-0 top-1 w-3.5 h-3.5 rounded-full border-2 border-white ${isBerangkat ? 'bg-emerald-500' : 'bg-blue-500'} shadow-sm"></div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-[10px] font-bold px-2 py-0.5 rounded ${badgeBg}">${log.status}</span>
+                            <span class="text-[10px] text-slate-400 font-medium">${log.wkt}</span>
+                        </div>
+                        <p class="text-xs font-bold text-slate-800">${log.nama}</p>
+                        <p class="text-xs text-slate-600">KM Odometer: <strong class="text-slate-900">${log.km.toLocaleString('id-ID')} KM</strong></p>
+                        <p class="text-[11px] text-slate-500">Kondisi: ${log.kondisi} • BBM: ${log.bensin}</p>
+                    </div>
+                `;
+            });
+        }
+
+        // Admin Table Rendering
+        function renderAdminTable() {
+            const filter = document.getElementById('filter-status').value;
+            const tbody = document.getElementById('admin-table-body');
+            tbody.innerHTML = '';
+
+            let totalKmAcc = 0;
+            let totalBbmAcc = 0;
+            let pendingCount = 0;
+
+            mockBookings.forEach(item => {
+                if (item.status === 'Menunggu Approval') pendingCount++;
+                if (item.status === 'Disetujui') {
+                    totalKmAcc += item.jarakKm;
+                    totalBbmAcc += item.biayaBbm;
+                }
+
+                if (filter !== 'ALL' && item.status !== filter) return;
+
+                let statusBadge = '';
+                if (item.status === 'Menunggu Approval') {
+                    statusBadge = '<span class="bg-amber-100 text-amber-800 px-2.5 py-1 rounded-full text-[10px] font-bold">Menunggu Approval</span>';
+                } else if (item.status === 'Disetujui') {
+                    statusBadge = '<span class="bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full text-[10px] font-bold">Disetujui</span>';
+                } else {
+                    statusBadge = '<span class="bg-rose-100 text-rose-800 px-2.5 py-1 rounded-full text-[10px] font-bold">Ditolak</span>';
+                }
+
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-50 transition">
+                        <td class="py-3.5 px-4">
+                            <p class="font-bold text-slate-900">${item.nama}</p>
+                            <p class="text-[10px] text-slate-500">${item.unit} • ${item.wa}</p>
+                        </td>
+                        <td class="py-3.5 px-4">
+                            <p class="font-semibold text-slate-800">${item.tujuan}</p>
+                            <p class="text-[10px] text-slate-500 truncate max-w-xs">${item.keperluan}</p>
+                        </td>
+                        <td class="py-3.5 px-4 text-slate-600 text-[11px]">
+                            ${item.tglBerangkat ? item.tglBerangkat.replace('T', ' ') : '-'}
+                        </td>
+                        <td class="py-3.5 px-4">
+                            <p class="font-bold text-emerald-600">${item.jarakKm} KM (PP)</p>
+                            <p class="text-[10px] text-slate-500">Rp ${item.biayaBbm.toLocaleString('id-ID')}</p>
+                        </td>
+                        <td class="py-3.5 px-4">
+                            <span class="inline-flex items-center space-x-1 text-uca-blue text-[11px] font-semibold underline cursor-pointer">
+                                <i data-lucide="paperclip" class="w-3 h-3"></i>
+                                <span>Surat.pdf</span>
+                            </span>
+                        </td>
+                        <td class="py-3.5 px-4">${statusBadge}</td>
+                        <td class="py-3.5 px-4 text-right space-x-1">
+                            ${item.status === 'Menunggu Approval' ? `
+                                <button onclick="updateBookingStatus('${item.id}', 'Disetujui')" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-bold transition">Setujui</button>
+                                <button onclick="updateBookingStatus('${item.id}', 'Ditolak')" class="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-[11px] font-bold transition">Tolak</button>
+                            ` : '<span class="text-slate-400 text-[11px]">Selesai</span>'}
+                        </td>
+                    </tr>
+                `;
+            });
+
+            // Update Header & Stat Cards
+            document.getElementById('stat-total').innerText = mockBookings.length;
+            document.getElementById('stat-pending').innerText = pendingCount;
+            document.getElementById('badge-pending').innerText = pendingCount;
+            document.getElementById('stat-km').innerText = `${totalKmAcc.toLocaleString('id-ID')} KM`;
+            document.getElementById('stat-bbm').innerText = `Rp ${totalBbmAcc.toLocaleString('id-ID')}`;
+
+            lucide.createIcons();
+        }
+
+        function updateBookingStatus(id, newStatus) {
+            const booking = mockBookings.find(b => b.id === id);
+            if (booking) {
+                booking.status = newStatus;
+                renderAdminTable();
+            }
+        }
+
+        // Export CSV Functionality
+        function exportToCSV() {
+            let csvContent = "data:text/csv;charset=utf-8,ID,Nama,Unit,Tujuan,Jarak (KM),Biaya BBM (Rp),Status\n";
+            mockBookings.forEach(b => {
+                csvContent += `${b.id},"${b.nama}","${b.unit}","${b.tujuan}",${b.jarakKm},${b.biayaBbm},${b.status}\n`;
+            });
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `Rekap_Peminjaman_Avanza_UCA_${new Date().toISOString().slice(0,10)}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // QR Code Modal Generator
+        function generateQrCode() {
+            const qrContainer = document.getElementById("qrcode-container");
+            qrContainer.innerHTML = "";
+            new QRCode(qrContainer, {
+                text: "https://uca.ac.id/logbook-avanza-b1234uca",
+                width: 140,
+                height: 140,
+                colorDark : "#0F2C59",
+                colorLight : "#ffffff",
+                correctLevel : QRCode.CorrectLevel.H
+            });
+        }
+
+        function openQrModal() {
+            document.getElementById('qr-modal').classList.remove('hidden');
+        }
+
+        function closeQrModal() {
+            document.getElementById('qr-modal').classList.add('hidden');
+        }
+    </script>
+</body>
+</html>
